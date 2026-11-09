@@ -94,7 +94,7 @@ Before spawning any fetchers, produce a **search plan** that maps the decomposit
 
 1. **Academic APIs first.** For topics with a research literature, hit Semantic Scholar / arXiv / OpenAlex / PubMed BEFORE web search. Academic APIs return citation-ranked canonical papers.
 
-2. **Web searches from the plan.** Execute ALL planned searches across all three lenses. Aim for **<< p.candidate_urls|dash >> candidate URLs** before deduplication for `full` tier.
+2. **Web searches from the plan.** Execute ALL planned searches across all three lenses. Aim for **<< p.candidate_urls|dash >> candidate URLs** before deduplication for `full` tier.<% if search_engine == "exa" %> Run every web search through `$HPR search-web "<query>" --run <vault_tag> -j` (Exa) instead of WebSearch: add `--category "research paper"` for academic-lens queries and `--since YYYY-MM-DD` for period-pinned ones. If a call returns `SEARCH_FAILED`, run that query through WebSearch instead.<% elif search_engine == "hybrid" %> Run every planned query through BOTH WebSearch and `$HPR search-web "<query>" --run <vault_tag> -j` (Exa: add `--category "research paper"` for academic-lens queries and `--since YYYY-MM-DD` for period-pinned ones), and merge both URL lists before deduplication.<% endif %>
 
 3. **Build and deduplicate the master URL queue.** Remove exact-URL duplicates. Remove obvious junk domains. The deduplicated queue should have **<< p.deduped_urls|dash >> URLs** for `full` tier.
 

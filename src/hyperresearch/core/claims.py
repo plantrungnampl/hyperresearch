@@ -261,3 +261,57 @@ def group_by_target(conn, vault_tag: str | None = None, min_sources: int = 2) ->
             "quantified": values,
         })
     return groups
+
+
+def _significant_numbers(numbers_json: str | None) -> list[str]:
+    """Numeric tokens worth matching: drop bare years and 1-char digits (match anywhere)."""
+    import re
+
+    from hyperresearch.core.citecheck import _NUMBER_RE
+
+    try:
+        raw = json.loads(numbers_json) if numbers_json else []
+    except json.JSONDecodeError:
+        raw = [numbers_json]
+    tokens = []
+    for item in raw if isinstance(raw, list) else [raw]:
+        for tok in _NUMBER_RE.findall(str(item)):
+            tok = tok.replace(",", "").rstrip(".")
+            if len(tok.rstrip("%")) < 2 or re.fullmatch(r"(19|20)\d\d", tok):
+                continue
+            tokens.append(tok)
+    return tokens
+
+
+def claim_coverage(conn, vault_tag: str, texts: dict[str, str], top_uncovered: int = 25) -> dict:
+    """How many of the run's quantified claims survive into each text.
+
+    `texts` maps a stage label (e.g. "draft-a", "final") to its markdown. A
+    claim counts as covered when any of its significant numbers appears in the
+    text. shortcut: number match only (no unit/entity check), so a reworded or
+    rounded figure reads as dropped; upgrade to entity+number matching if the
+    ledger's misses turn out to be mostly rounding.
+    """
+    rows = conn.execute(
+        "SELECT note_id, claim, numbers, confidence, evidence_type FROM claims "
+        "WHERE vault_tag = ? AND numbers IS NOT NULL",
+        (vault_tag,),
+    ).fetchall()
+    claims = [(dict(r), _significant_numbers(r["numbers"])) for r in rows]
+    claims = [(c, nums) for c, nums in claims if nums]
+
+    stages = {}
+    for label, text in texts.items():
+        flat = text.replace(",", "")
+        missed = [c for c, nums in claims if not any(n in flat for n in nums)]
+        missed.sort(key=lambda c: (c["confidence"] != "high",
+                                   c["evidence_type"] not in ("empirical", "statistical")))
+        stages[label] = {
+            "covered": len(claims) - len(missed),
+            "total": len(claims),
+            "ratio": round((len(claims) - len(missed)) / len(claims), 3) if claims else None,
+            "uncovered": [
+                {"note_id": c["note_id"], "claim": c["claim"]} for c in missed[:top_uncovered]
+            ],
+        }
+    return {"vault_tag": vault_tag, "quantified_claims": len(claims), "stages": stages}

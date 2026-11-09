@@ -60,6 +60,7 @@ def config_set(
         "web.provider": "web_provider",
         "web.profile": "web_profile",
         "web.magic": "web_magic",
+        "web.search_engine": "web_search_engine",
         "search.boost_evergreen": "search_boost_evergreen",
         "search.penalize_deprecated": "search_penalize_deprecated",
         "sync.auto_sync": "auto_sync",
@@ -71,6 +72,13 @@ def config_set(
         console.print(f"[red]Unknown config key:[/] {key}")
         console.print(f"[dim]Valid keys: {', '.join(key_map.keys())}[/]")
         raise typer.Exit(1)
+
+    if attr == "web_search_engine":
+        from hyperresearch.core.render import SEARCH_ENGINES
+
+        if value not in SEARCH_ENGINES:
+            console.print(f"[red]web.search_engine must be one of:[/] {', '.join(SEARCH_ENGINES)}")
+            raise typer.Exit(1)
 
     # Type coercion
     if attr in ("auto_sync", "auto_build_index", "web_magic"):
@@ -102,6 +110,7 @@ def config_get(
         "web.provider": "web_provider",
         "web.profile": "web_profile",
         "web.magic": "web_magic",
+        "web.search_engine": "web_search_engine",
         "search.boost_evergreen": "search_boost_evergreen",
         "search.penalize_deprecated": "search_penalize_deprecated",
         "sync.auto_sync": "auto_sync",

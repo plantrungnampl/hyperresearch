@@ -66,3 +66,32 @@ def citecheck_extract(
             f"{data['sampled_for_llm']} sampled for LLM verification, "
             f"{summary['dangling']} dangling"
         )
+
+
+@app.command("render")
+def citecheck_render(
+    report: str = typer.Argument(..., help="Wikilink-cited report to render"),
+    out: str | None = typer.Option(None, "--out", "-o", help="Output path (default: overwrite REPORT)"),
+    json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
+) -> None:
+    """Render `[[note-id]]` citations as numbered `[N]` + a vault-built Sources list."""
+    from hyperresearch.core.citecheck import render_inline
+    from hyperresearch.core.vault import Vault, VaultError
+
+    try:
+        vault = Vault.discover()
+        vault.auto_sync()
+        src = Path(report)
+        rendered, info = render_inline(src.read_text(encoding="utf-8-sig"), vault.db)
+    except (VaultError, ValueError, OSError) as e:
+        output(error(str(e), "RENDER_FAILED"), json_mode=json_output)
+        raise typer.Exit(1)
+    dest = Path(out) if out else src
+    dest.write_text(rendered, encoding="utf-8")
+    data = {"out": str(dest), **info}
+    if json_output:
+        output(success(data), json_mode=True)
+    else:
+        console.print(f"Rendered {info['sources']} sources -> {dest}")
+        if info["unresolved"]:
+            console.print(f"[yellow]Unresolved wikilinks left in place:[/] {', '.join(info['unresolved'])}")

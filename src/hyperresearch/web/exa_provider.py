@@ -67,25 +67,47 @@ class ExaProvider:
         self._include_domains = include_domains
         self._exclude_domains = exclude_domains
 
-    def search(self, query: str, max_results: int = 5) -> list[WebResult]:
-        """Search the web via Exa and return ranked results with content."""
+    def search(
+        self,
+        query: str,
+        max_results: int = 5,
+        category: str | None = None,
+        start_published_date: str | None = None,
+    ) -> list[WebResult]:
+        """Search the web via Exa and return ranked results with content.
+
+        `category` / `start_published_date` override the instance defaults per
+        call (e.g. "research paper", "2023-01-01") for the width-sweep lenses.
+        """
+        kwargs = self._request_kwargs(max_results)
+        kwargs["type"] = self._search_type
+        if category or self._category:
+            kwargs["category"] = category or self._category
+        if start_published_date:
+            kwargs["start_published_date"] = start_published_date
+        response = self._client.search(query, **kwargs)
+        return [_to_web_result(r) for r in response.results]
+
+    def find_similar(self, url: str, max_results: int = 5) -> list[WebResult]:
+        """Pages semantically similar to `url` — citation-chasing without a bibliography."""
+        kwargs = self._request_kwargs(max_results)
+        kwargs["exclude_source_domain"] = True
+        response = self._client.find_similar(url, **kwargs)
+        return [_to_web_result(r) for r in response.results]
+
+    def _request_kwargs(self, max_results: int) -> dict[str, Any]:
         kwargs: dict[str, Any] = {
             "num_results": max_results,
-            "type": self._search_type,
             "contents": {
                 "text": {"max_characters": self._text_max_characters},
                 "highlights": True,
             },
         }
-        if self._category:
-            kwargs["category"] = self._category
         if self._include_domains:
             kwargs["include_domains"] = self._include_domains
         if self._exclude_domains:
             kwargs["exclude_domains"] = self._exclude_domains
-
-        response = self._client.search(query, **kwargs)
-        return [_to_web_result(r) for r in response.results]
+        return kwargs
 
     def fetch(self, url: str) -> WebResult:
         """Fetch a single URL via Exa /contents and return clean text."""

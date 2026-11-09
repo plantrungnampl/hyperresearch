@@ -3018,7 +3018,11 @@ those primaries gives the pipeline higher-authority sources to cite.
      PYTHONIOENCODING=utf-8 {hpr_path} fetch "<url>" --tag <topic> --suggested-by <note-id-that-cited-it> --suggested-by-reason "cited as primary source" -j
      ```
    - If you only have author + title (no URL), use WebSearch to locate it:
-     search for `"<author> <title> <year>"` or `"<title> filetype:pdf"`
+     search for `"<author> <title> <year>"` or `"<title> filetype:pdf"`<% if search_engine != "websearch" %>
+     (or `PYTHONIOENCODING=utf-8 {hpr_path} search-web "<author> <title>" -n 5 -j`)
+   - If a load-bearing source has no usable bibliography, list related
+     primary sources with `PYTHONIOENCODING=utf-8 {hpr_path} search-web --similar "<its url>" -n 8 -j`
+     and fetch the relevant ones with `--suggested-by` as above<% endif %>
    - For academic papers: try these URL patterns directly:
      - arXiv: `https://arxiv.org/abs/<id>` or search arXiv
      - DOI: `https://doi.org/<doi>` — fetch the DOI URL directly

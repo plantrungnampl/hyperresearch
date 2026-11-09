@@ -192,6 +192,10 @@ class VaultConfig:
     web_provider: str = "builtin"
     web_profile: str = ""  # crawl4ai browser profile name (created via `crwl profiles`)
     web_magic: bool = False  # crawl4ai magic mode (anti-bot stealth)
+    # Discovery engine for the width sweep: "websearch" (Claude's built-in tool),
+    # "exa" (hpr search-web via Exa), or "hybrid" (both, deduped). Fetching
+    # always stays on web_provider so sources keep their full text.
+    web_search_engine: str = "websearch"
 
     # Pipeline scale gear ([pipeline] section) — the profile whose numbers are
     # rendered into installed skills/agents. Set via `hpr profile use <name>`.
@@ -247,6 +251,7 @@ class VaultConfig:
             web_provider=web.get("provider", cls.web_provider),
             web_profile=web.get("profile", cls.web_profile),
             web_magic=web.get("magic", cls.web_magic),
+            web_search_engine=web.get("search_engine", cls.web_search_engine),
             pipeline_profile=pipeline.get("profile", cls.pipeline_profile),
             profile_overlays=data.get("profile", {}),
             fetch=_build_section(FetchSettings, data.get("fetch", {})),
@@ -311,6 +316,7 @@ class VaultConfig:
             f'provider = "{self.web_provider}"',
             f'profile = "{self.web_profile}"',
             f"magic = {'true' if self.web_magic else 'false'}",
+            f'search_engine = "{self.web_search_engine}"',
             "",
             "[pipeline]",
             f'profile = "{self.pipeline_profile}"',

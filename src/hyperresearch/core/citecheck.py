@@ -212,3 +212,50 @@ def write_pairs_file(vault, vault_tag: str, report_path, sample_rate: float = 0.
         json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8"
     )
     return out
+
+
+# A run of adjacent wikilinks ("[[a]][[b]]", "[[a]], [[b]]") becomes one grouped marker.
+_WIKI_RUN_RE = re.compile(r"\[\[[^\]]+\]\](?:[ \t]*,?[ \t]*\[\[[^\]]+\]\])*")
+
+
+def render_inline(report_text: str, conn) -> tuple[str, dict]:
+    """Deterministically turn `[[note-id]]` citations into `[N]` + a `## Sources` list.
+
+    Numbers follow first appearance; each source's title and URL come from the
+    vault (sources ledger, else the note's `source` field), never from model
+    text. Wikilinks to notes without a URL (workspace notes, stubs) are left in
+    place and reported in `unresolved` so the caller can decide.
+    """
+    if re.search(r"^##\s+(?:Sources|References)\b", report_text, re.M | re.I):
+        raise ValueError("report already has a Sources/References section")
+
+    url_of: dict[str, tuple[str, str]] = {}
+
+    def _lookup(note_id: str) -> tuple[str, str] | None:
+        if note_id not in url_of:
+            row = conn.execute(
+                "SELECT n.title, COALESCE(s.url, n.source) AS url FROM notes n "
+                "LEFT JOIN sources s ON s.note_id = n.id WHERE n.id = ?",
+                (note_id,),
+            ).fetchone()
+            if row is None or not row["url"]:
+                return None
+            url_of[note_id] = (row["title"], row["url"])
+        return url_of[note_id]
+
+    number: dict[str, int] = {}
+    unresolved: set[str] = set()
+
+    def _replace(m: re.Match) -> str:
+        ids = [w.group(1).strip() for w in WIKI_LINK_RE.finditer(m.group(0))]
+        if any(_lookup(i) is None for i in ids):
+            unresolved.update(i for i in ids if _lookup(i) is None)
+            return m.group(0)
+        for i in ids:
+            number.setdefault(i, len(number) + 1)
+        return "[" + ", ".join(str(n) for n in sorted({number[i] for i in ids})) + "]"
+
+    body = _WIKI_RUN_RE.sub(_replace, report_text).rstrip()
+    sources = [f"[{n}] {url_of[i][0]}. {url_of[i][1]}" for i, n in number.items()]
+    rendered = body + "\n\n## Sources\n\n" + "\n".join(sources) + "\n" if sources else body + "\n"
+    return rendered, {"sources": len(number), "unresolved": sorted(unresolved)}

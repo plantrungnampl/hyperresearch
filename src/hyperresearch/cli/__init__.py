@@ -89,6 +89,10 @@ app.command("fetch")(_fetch)
 from hyperresearch.cli.fetch_batch import fetch_batch as _fetch_batch
 
 app.command("fetch-batch")(_fetch_batch)
+
+from hyperresearch.cli.search_web import search_web as _search_web
+
+app.command("search-web")(_search_web)
 app.command("research")(_research)
 app.command("tags")(_tags)
 app.command("show", hidden=True)(_show)

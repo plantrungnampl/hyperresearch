@@ -15,6 +15,7 @@ build/
 bench/
 codex_bench/
 draco-bench/
+bench-runs/
 
 # Agent install outputs — generated per-user by `hyperresearch install`.
 # These files contain absolute paths resolved to the installing user's
@@ -30,3 +31,4 @@ GEMINI.md
 research/
 
 .knack/
+.serena/

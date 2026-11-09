@@ -153,3 +153,42 @@ def claims_targets(
     else:
         for g in groups:
             console.print(f"  [cyan]{g['stance_target']}[/] {g['n_sources']} sources, {g['n_claims']} claims, stances={g['stances']}")
+
+
+@app.command("coverage")
+def claims_coverage(
+    vault_tag: str = typer.Argument(..., help="Run whose quantified claims to track"),
+    files: list[str] = typer.Option(
+        [], "--file", help="label=path to measure instead of the default stage files (repeatable)"
+    ),
+    top: int = typer.Option(25, "--top", help="Uncovered claims listed per stage"),
+    json_output: bool = typer.Option(False, "--json", "-j", help="JSON output"),
+) -> None:
+    """Claim-survival ledger: share of quantified claims present at each stage.
+
+    Default stages, when present: draft-a/b/c, synthesis-pass1, final report.
+    """
+    from hyperresearch.core.claims import claim_coverage
+
+    vault = _vault_or_exit(json_output)
+    if files:
+        paths = {}
+        for spec in files:
+            label, sep, path = spec.partition("=")
+            paths[label if sep else Path(spec).stem] = Path(path if sep else spec)
+    else:
+        temp = vault.run_dir(vault_tag) / "temp"
+        paths = {name: temp / f"{name}.md" for name in ("draft-a", "draft-b", "draft-c", "synthesis-pass1")}
+        paths["final"] = vault.notes_dir / f"final_report_{vault_tag}.md"
+    texts = {k: p.read_text(encoding="utf-8-sig") for k, p in paths.items() if p.exists()}
+    if not texts:
+        output(error(f"no stage files found for {vault_tag}", "NOT_FOUND"), json_mode=json_output)
+        raise typer.Exit(1)
+
+    result = claim_coverage(vault.db, vault_tag, texts, top_uncovered=top)
+    if json_output:
+        output(success(result, vault=str(vault.root)), json_mode=True)
+        return
+    console.print(f"[bold]{result['quantified_claims']}[/] quantified claims for {vault_tag}")
+    for label, st in result["stages"].items():
+        console.print(f"  {label:<16} {st['covered']}/{st['total']}  ({st['ratio']})")

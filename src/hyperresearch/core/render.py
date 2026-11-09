@@ -26,10 +26,14 @@ a prompt with a hole in it.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from jinja2 import Environment, StrictUndefined
 
-from hyperresearch.core.profiles import Profile, list_profiles, resolve_profile
+from hyperresearch.core.config import VaultConfig
+from hyperresearch.core.profiles import list_profiles, resolve_profile
+
+SEARCH_ENGINES = ("websearch", "exa", "hybrid")
 
 EN_DASH = "–"
 
@@ -64,16 +68,23 @@ def prompt_env() -> Environment:
 def build_render_context(
     config_path: Path | None = None,
     primary: str = "full",
-) -> dict[str, Profile]:
-    """Resolve every available profile; expose each by name plus `p` (primary)."""
+) -> dict[str, Any]:
+    """Resolve every available profile; expose each by name plus `p` (primary).
+
+    Also exposes `search_engine` (the vault's [web] search_engine) so the
+    width sweep and fetcher prompts render the discovery instructions in use.
+    """
     profiles = {name: resolve_profile(name, config_path) for name in list_profiles(config_path)}
     if primary not in profiles:
         # resolve_profile raises a helpful error for unknown names
         profiles[primary] = resolve_profile(primary, config_path)
-    return {"p": profiles[primary], **profiles}
+    engine = VaultConfig.load(config_path).web_search_engine if config_path else "websearch"
+    if engine not in SEARCH_ENGINES:
+        raise ValueError(f"[web] search_engine must be one of {SEARCH_ENGINES}, got {engine!r}")
+    return {"p": profiles[primary], **profiles, "search_engine": engine}
 
 
-def render_prompt(text: str, context: dict[str, Profile]) -> str:
+def render_prompt(text: str, context: dict[str, Any]) -> str:
     """Render one prompt template with the given profile context."""
     return prompt_env().from_string(text).render(**context)
 
